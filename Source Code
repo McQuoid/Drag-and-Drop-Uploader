@@ -6,11 +6,10 @@ SetWorkingDir %A_ScriptDir%
 
 commands=
 (
-net use X: [Your URL Destination Here] /persistent:yes
+net use X: [Set Folder Location Here] /persistent:yes
 )
 runwait, %comspec% /c %commands%,,Hide
 
-set = 1
 height := A_ScreenHeight-260
 width := A_ScreenWidth-530
 FormatTime, CurrentYear,, yyyy
@@ -18,12 +17,42 @@ data_dir=X:\ESPO\AllOrders\%CurrentYear%
 
 Gui, +AlwaysOnTop
 gui, font, bold,
-Gui, add,edit, x10 y10 w500 h140  vinfo -vscroll +disabled,Send files directly to SharePoint Documents Related to Orders.`n`nHold Ctrl and begin selecting files you wish to move.`nDrag and drop the selected files into this box.`nPress Upload Files.
+Gui, add,edit, x10 y10 w500 h140  vmyedit -hscroll -vscroll +Wrap +hidden 
+Gui, add,edit, x10 y10 w500 h140  vinfo -vscroll +disabled,Send files directly to SharePoint Documents Related to Orders.`n`nHold Ctrl and begin selecting files you wish to move.`nDrag and drop the selected files into this box.`nMouse over this box at any time to view files in queue.`nThere is no limit to the amount of files you can add.`nHowever the queue will only show a few of the most recently added files.`nWhen ready press Upload Files.
 gui, font, normal,
 Gui, add,button, w100 gdata,Upload Files
-Gui, Add, Button, xp+105 w100 gClear, Clear / Info
+Gui, Add, Button, xp+105 w100 gClear,Clear
+Gui, Add, Radio, xp+120 yp-4 checked vMyvar, Upload and keep
+Gui, Add, Radio, yp+15, Upload and remove from my computer
 Gui, show, x%width% y%height% w520 h185 ,Orders Uploader
-SetTimer, MouseOverPicture ,1
+Gui, +HwndHwnd2
+OnMessage("0x200", "MOUSEOVER")
+SetTimer, MOUSELEAVE, 10000
+return
+ 
+MOUSEOVER(){
+	Global Hwnd2
+	MouseGetPos, , , Hwnd
+	if(Hwnd = Hwnd2){
+		GuiControl,hide, info,
+		sleep,200
+		ControlSend,, ^{End}, ahk_id %Hwnd2%
+		sleep,200
+		GuiControl,disable, myedit,
+		GuiControl,show, myedit,
+	}
+}
+ 
+MOUSELEAVE(){
+	Global Hwnd2
+	MouseGetPos, , , Hwnd
+	if(Hwnd != Hwnd2){
+		GuiControl,hide, myedit,
+		GuiControl,enable, myedit,
+		GuiControl,show, info,
+	}
+}
+ 
 return 
 
 Clear:
@@ -35,18 +64,39 @@ if (list="")
 MsgBox, nofiles in list
 _dir:=data_dir
 gosub move_them
-MsgBox, File(s) Uploaded Successfully!
+MsgBox, 4,, File(s) Uploaded Successfully...`nWould you like to check SharePoint?
+IfMsgBox Yes
+{
+    Run, iexplore.exe [Set Page Location Here], , Max
+reload
+}
+else
 reload
 return
 
 
 move_them:
+Gui Submit
+if Myvar = 1
+{
 Loop, parse, list, `n
 {
 splitpath,A_LoopField,name
 FileCopy, %A_LoopField%,%_dir%
 }
 return 
+}     
+else
+{
+Loop, parse, list, `n
+{
+splitpath,A_LoopField,name
+FileMove, %A_LoopField%,%_dir%
+}
+return 
+}
+    
+
 
 guidropfiles:
 GuiControl,, MyEdit
@@ -55,27 +105,6 @@ Loop, parse, FileList, `n
 list .=A_LoopField "`n"
 GuiControl,, MyEdit, %list%
 return 
-
-
-MouseOverPicture:
-Gui, Submit, NoHide
-MouseGetPos,,,,id, 2
-if ( id = Picture)
-{
-   if  ( set = "1" )
-   {
-GuiControl,hide, Info,
-gui, font, bold,
-Gui, add,edit, x10 y10 w500 h140  vmyedit
-     set = 0
-   }
-   return
-}
-if ( set = "0" )
-{
-}
-return
-
 
 GuiClose:
 ExitApp
